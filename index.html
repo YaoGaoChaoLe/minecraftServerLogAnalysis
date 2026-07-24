@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh">
 <head>
@@ -712,7 +713,7 @@ textarea { scrollbar-width: thin; }
             const isQuit = text.includes("lost connection") || text.includes("left the game") || text.includes("Disconnecting");
             const isLogin = text.includes("logged in");
             const isGrim = AppState.anticheatKeywords.some(kw => text.includes(kw));
-            const isServer = text.includes("[Server]");
+            const isServer = text.includes("[Server]") || text.includes("本服禁止使用辅助模组");
 
             let cleaned = text.replace(/\[Server thread\/INFO\]: \[Not Secure\] /, "").replace(/\[Server thread\/INFO\]: /, "");
             if (isChat) AppState.chatLines.push(cleaned);
