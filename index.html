@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Minecraft 离线日志分析器</title>
+<title>YaoGaoChaoLe_服务器日志分析</title>
 <style>
 /* ===========================
    全局重置与基础布局
@@ -179,6 +178,23 @@ body {
     min-height: 0; border: 1px solid #2c2c2c;
 }
 
+/* 配置面板 */
+.config-panel {
+    background: #1a1a1a; border-bottom: 1px solid #2c2c2c;
+    padding: 12px; display: flex; flex-direction: column; gap: 10px;
+}
+.config-row {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.config-row label { min-width: 90px; color: #ccc; }
+.config-row input { flex: 1; min-width: 200px; padding: 6px 8px; background: #0f0f0f; color: #e0e0e0; border: 1px solid #3a3a3a; border-radius: 4px; font-family: monospace; }
+.config-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.config-actions button { padding: 6px 14px; background: #2c2c2c; color: #0fc; border: 1px solid #3a3a3a; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.config-actions button:hover { background: #3a3a3a; color: #fff; }
+.config-toggle { cursor: pointer; color: #0fc; text-decoration: underline; font-size: 13px; }
+.config-toggle:hover { color: #fff; }
+.config-hint { font-size: 12px; color: #aaa; margin-left: 98px; }
+
 /* ===========================
    IP 记录与查询面板（登录查询）
    =========================== */
@@ -284,11 +300,10 @@ body {
 /* 宽屏下 IP 面板左右布局 */
 @media (min-width: 501px) {
     .player-ip-container { flex-direction: row; }
-    .ip-record-area { flex: 7.5; }   /* 75% */
-    .ip-query-area { flex: 2.5; }    /* 25% */
+    .ip-record-area { flex: 7.5; }
+    .ip-query-area { flex: 2.5; }
 }
 
-/* 窄屏下 IP 查询区域自动移到下方（已在 flex column 中实现） */
 @media (max-width: 500px) {
     .player-ip-container { flex-direction: column; }
     .ip-query-area { min-height: 200px; }
@@ -372,12 +387,11 @@ textarea { scrollbar-width: thin; }
 <!-- ===== 上传覆盖层 ===== -->
 <div id="upload-overlay">
   <div class="upload-card">
-    <h2>📁 离线日志分析器</h2>
-    <p style="color:#ccc; text-align:center;">选择或粘贴 latest.log 内容</p>
+    <h2>离线日志分析器</h2>
+    <p style="color:#ccc; text-align:center;">选择 latest.log 文件<br>或粘贴日志内容</p>
     <input type="file" id="file-input" accept=".log,.txt">
     <textarea id="text-input" placeholder="或直接粘贴日志内容..."></textarea>
-    <button class="submit-btn" id="submit-log-btn">提交并分析</button>
-    <div class="info">支持大文件，分批加载不卡顿</div>
+    <button class="submit-btn" id="submit-log-btn">分析</button>
   </div>
 </div>
 
@@ -391,8 +405,8 @@ textarea { scrollbar-width: thin; }
 <div class="tab-bar" id="tab-bar">
   <button class="tab-button active" data-tab="console">控制台</button>
   <button class="tab-button" data-tab="chat">聊天记录</button>
-  <button class="tab-button" data-tab="joinquit">进出记录</button>
-  <button class="tab-button" data-tab="grim">反作弊日志</button>
+  <button class="tab-button" data-tab="joinquit">断开连接</button>
+  <button class="tab-button" data-tab="grim">仅看关键词</button>
   <button class="tab-button" data-tab="playerip">登录查询</button>
 </div>
 
@@ -443,7 +457,7 @@ textarea { scrollbar-width: thin; }
   <!-- 进出记录 -->
   <div id="tab-joinquit" class="tab-content">
     <div class="sub-header">
-      <span>进出记录</span>
+      <span>断开连接</span>
       <div class="scroll-buttons">
         <button id="joinquit-scroll-top" class="scroll-btn">↑</button>
         <button id="joinquit-scroll-bottom" class="scroll-btn">↓</button>
@@ -452,15 +466,36 @@ textarea { scrollbar-width: thin; }
     <textarea id="joinquit-text" class="log-textarea" readonly wrap="off"></textarea>
   </div>
 
-  <!-- 反作弊日志（左右分栏） -->
+  <!-- 仅看关键词（原反作弊日志） -->
   <div id="tab-grim" class="tab-content">
+    <div class="sub-header">
+      <span>仅看关键词</span>
+      <span class="config-toggle" id="grim-config-toggle">⚙ 配置关键词</span>
+    </div>
+    <!-- 关键词配置面板（默认折叠） -->
+    <div id="grim-config-panel" class="config-panel" style="display:none;">
+      <div class="config-row">
+        <label>关键词1：</label>
+        <input type="text" id="grim-left-keywords" placeholder="多个关键词用半角逗号分隔，如: warn,error">
+      </div>
+      <div class="config-row">
+        <label>关键词2：</label>
+        <input type="text" id="grim-right-keywords" placeholder="多个关键词用半角逗号分隔，如: [Server],warn,error">
+      </div>
+      <div class="config-hint">💡 多个关键词用 半角逗号(英文输入法下的逗号) 分隔。但不要以逗号结尾</div>
+      <div class="config-actions">
+        <button id="grim-apply-config">应用</button>
+        <button id="grim-reset-config">重置默认</button>
+        <button id="grim-cancel-config">取消</button>
+      </div>
+    </div>
     <div class="split-panel">
       <div class="split-half">
-        <div class="sub-header">反作弊日志</div>
+        <div class="sub-header">包含 关键词1 的日志</div>
         <textarea id="grim-text" class="log-textarea" readonly wrap="off"></textarea>
       </div>
       <div class="split-half">
-        <div class="sub-header">[Server] 信息</div>
+        <div class="sub-header">包含 关键词2 的日志</div>
         <textarea id="server-text" class="log-textarea" readonly wrap="off"></textarea>
       </div>
     </div>
@@ -499,18 +534,19 @@ textarea { scrollbar-width: thin; }
 <script>
 (function() {
     // ============================================================
-    // 1. 硬编码配置（来自 config.yml）
+    // 1. 配置
     // ============================================================
-    const FILTER_KEYWORDS = [ // 忽略日志行
+    const FILTER_KEYWORDS = [
         "failed to",
-        "voicechat",
         "PacketEvents caught an unhandled exception while calling your listener",
         "	at ",
+        "	... ",
         "java.lang.",
+        "io.netty.",
         "§f你似乎没有注意到§e左下角聊天框的信息？",
-        "§f请留意游戏内左下角聊天信息。"
+        "§f请留意游戏内左下角聊天信息。",
     ];
-    const HIGHLIGHT_RULES = [ // 高亮规则
+    const HIGHLIGHT_RULES = [
         { keyword: "Server empty for", color: "#ff0000" },
         { keyword: "error", color: "#ff0000" },
         { keyword: "warn", color: "#fbff00" },
@@ -519,19 +555,25 @@ textarea { scrollbar-width: thin; }
         { keyword: "触发了", color: "#00ffea" },
         { keyword: "反作弊", color: "#00ffea" },
         { keyword: "Grim", color: "#00ffea" },
+        { keyword: "meteor", color: "#00ffea" },
+        { keyword: "liquid", color: "#00ffea" },
+        { keyword: "wurst", color: "#00ffea" },
+        { keyword: "Successfully filled", color: "#666666" },
+        { keyword: "Changed the block at", color: "#666666" },
         { keyword: "lost connection", color: "#666666" },
         { keyword: "left the game", color: "#666666" },
-        { keyword: "voicechat", color: "#666666" },
+        { keyword: "[voicechat]", color: "#666666" },
         { keyword: "Disconnecting", color: "#666666" },
         { keyword: "Thread RCON", color: "#666666" },
         { keyword: "logged in with entity", color: "#3BF010" },
         { keyword: "info", color: "#ffffff" }
     ];
-    const ANTICHEAT_KEYWORDS = [ // 反作弊日志
-        "触发了",
-        "[Server]",
-        "Grim "
-    ];
+
+    // 默认反作弊关键词配置
+    const DEFAULT_ANTICHEAT_CONFIG = {
+        leftKeywords: ["触发了","Grim ","meteor","wurst","Mod list mismatch"],
+        rightKeywords: ["[Server]","moved ","本服禁止使用辅助模组"]
+    };
 
     // ============================================================
     // 2. 状态对象
@@ -542,6 +584,7 @@ textarea { scrollbar-width: thin; }
         joinQuitLines: [],
         grimLines: [],
         serverLines: [],
+        rawDisplayLines: [],  // 存储控制台显示行的原始文本
         ipLoginRecords: [],
         expandedIps: new Set(),
         expandedGroups: new Set(),
@@ -549,7 +592,7 @@ textarea { scrollbar-width: thin; }
         autoWrapEnabled: false,
         ipLocationCache: new Map(),
         highlightRules: HIGHLIGHT_RULES,
-        anticheatKeywords: ANTICHEAT_KEYWORDS,
+        anticheatConfig: { ...DEFAULT_ANTICHEAT_CONFIG },
         minimapWindowSize: 1000,
         minimapDragging: false,
         minimapStartY: 0,
@@ -631,26 +674,85 @@ textarea { scrollbar-width: thin; }
     };
 
     // ============================================================
-    // 4. IP 归属地查询服务（允许联网）
+    // 4. IP 归属地查询服务
     // ============================================================
     const IpLocationService = {
+        _apiFetchers: [
+            {
+                name: 'ip-api.com',
+                fetch: async (ips) => {
+                    const resp = await fetch("http://ip-api.com/batch", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(ips)
+                    });
+                    const data = await resp.json();
+                    if (!Array.isArray(data) || data.length !== ips.length) {
+                        throw new Error("返回格式错误或长度不匹配");
+                    }
+                    return data;
+                }
+            },
+            {
+                name: 'ipapi.co',
+                fetch: async (ips) => {
+                    const results = [];
+                    for (const ip of ips) {
+                        try {
+                            const resp = await fetch(`https://ipapi.co/${ip}/json/`);
+                            const data = await resp.json();
+                            if (data.error) throw new Error(data.reason);
+                            results.push({
+                                status: "success",
+                                country: data.country_name,
+                                regionName: data.region,
+                                city: data.city
+                            });
+                        } catch {
+                            results.push({ status: "fail" });
+                        }
+                    }
+                    return results;
+                }
+            },
+            {
+                name: 'ipinfo.io',
+                fetch: async (ips) => {
+                    const results = [];
+                    for (const ip of ips) {
+                        try {
+                            const resp = await fetch(`https://ipinfo.io/${ip}/json`);
+                            const data = await resp.json();
+                            if (data.bogon || data.error) throw new Error("无效IP");
+                            results.push({
+                                status: "success",
+                                country: data.country,
+                                regionName: data.region,
+                                city: data.city
+                            });
+                        } catch {
+                            results.push({ status: "fail" });
+                        }
+                    }
+                    return results;
+                }
+            }
+        ],
+
         async batchQuery(ips, progressCb) {
             const resultMap = new Map();
             let completed = 0;
             const chunks = [];
-            for (let i=0; i<ips.length; i+=100) chunks.push(ips.slice(i, i+100));
+            for (let i = 0; i < ips.length; i += 100) chunks.push(ips.slice(i, i + 100));
+
             for (const chunk of chunks) {
                 const needQuery = chunk.filter(ip => !AppState.ipLocationCache.has(ip));
                 if (needQuery.length > 0) {
-                    try {
-                        const resp = await fetch("http://ip-api.com/batch", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify(needQuery)
-                        });
-                        const data = await resp.json();
-                        if (Array.isArray(data)) {
-                            for (let idx=0; idx<needQuery.length; idx++) {
+                    let batchSuccess = false;
+                    for (const api of this._apiFetchers) {
+                        try {
+                            const data = await api.fetch(needQuery);
+                            for (let idx = 0; idx < needQuery.length; idx++) {
                                 const ip = needQuery[idx], info = data[idx];
                                 let loc = { province: "未知", city: "", full: "未知" };
                                 if (info && info.status === "success") {
@@ -658,17 +760,25 @@ textarea { scrollbar-width: thin; }
                                     if (provinceMap[region]) region = provinceMap[region];
                                     const fullStr = `${info.country} ${region} ${info.city}`;
                                     loc = Utils.extractProvinceCity(fullStr);
-                                    if (loc.province === "未知" && region) { loc.province = region; loc.full = `${info.country} ${region}`; }
-                                    else if (loc.province !== "未知") loc.full = `${info.country} ${loc.province}`;
+                                    if (loc.province === "未知" && region) {
+                                        loc.province = region;
+                                        loc.full = `${info.country} ${region}`;
+                                    } else if (loc.province !== "未知") {
+                                        loc.full = `${info.country} ${loc.province}`;
+                                    }
                                 }
                                 AppState.ipLocationCache.set(ip, loc);
                                 resultMap.set(ip, loc);
                                 completed++;
                                 if (progressCb) progressCb(completed, ips.length);
                             }
-                        } else throw new Error("批量查询返回格式错误");
-                    } catch(e) {
-                        console.error("批量查询失败:", e);
+                            batchSuccess = true;
+                            break;
+                        } catch (e) {
+                            console.warn(`${api.name} 查询失败:`, e);
+                        }
+                    }
+                    if (!batchSuccess) {
                         for (const ip of needQuery) {
                             const loc = { province: "未知", city: "", full: "未知" };
                             AppState.ipLocationCache.set(ip, loc);
@@ -699,21 +809,20 @@ textarea { scrollbar-width: thin; }
             return m ? m[1] : "";
         },
         processLineData(line) {
-            // 1. 检查是否匹配过滤关键词，匹配则完全丢弃（不进入任何分类）
+            // 全局过滤词检查
             const shouldFilter = FILTER_KEYWORDS.some(kw => line.toLowerCase().includes(kw.toLowerCase()));
             if (shouldFilter) {
                 return null;
             }
 
-            // 2. 分类逻辑（仅对未过滤的行生效）
             const text = line;
             const isChat = text.includes("聊") || text.includes("[Not Secure]") || text.includes("[Server]") ||
                            text.includes("[Rcon]") || text.includes("[TEAM_ONLY]") || text.includes("[SHOUT]") ||
                            /<[a-zA-Z0-9_]+>/.test(text);
             const isQuit = text.includes("lost connection") || text.includes("left the game") || text.includes("Disconnecting");
             const isLogin = text.includes("logged in");
-            const isGrim = AppState.anticheatKeywords.some(kw => text.includes(kw));
-            const isServer = text.includes("[Server]") || text.includes("本服禁止使用辅助模组");
+            const isGrim = AppState.anticheatConfig.leftKeywords.some(kw => text.includes(kw));
+            const isServer = AppState.anticheatConfig.rightKeywords.some(kw => text.includes(kw));
 
             let cleaned = text.replace(/\[Server thread\/INFO\]: \[Not Secure\] /, "").replace(/\[Server thread\/INFO\]: /, "");
             if (isChat) AppState.chatLines.push(cleaned);
@@ -755,9 +864,30 @@ textarea { scrollbar-width: thin; }
                 minimapContent: document.getElementById('minimap-content'),
                 minimapIndicator: document.getElementById('minimap-indicator'),
                 minimapSizeInput: document.getElementById('minimap-window-size'),
+                grimLeftInput: document.getElementById('grim-left-keywords'),
+                grimRightInput: document.getElementById('grim-right-keywords'),
+                grimConfigPanel: document.getElementById('grim-config-panel'),
+                grimConfigToggle: document.getElementById('grim-config-toggle'),
             };
             this.bindEvents();
             this.setAllWrapMode(AppState.autoWrapEnabled);
+            this.loadAnticheatConfig();
+        },
+        loadAnticheatConfig() {
+            try {
+                const saved = localStorage.getItem('anticheatConfig');
+                if (saved) {
+                    const config = JSON.parse(saved);
+                    if (config.leftKeywords && config.rightKeywords) {
+                        AppState.anticheatConfig = config;
+                    }
+                }
+            } catch (e) {}
+            this.elements.grimLeftInput.value = AppState.anticheatConfig.leftKeywords.join(',');
+            this.elements.grimRightInput.value = AppState.anticheatConfig.rightKeywords.join(',');
+        },
+        saveAnticheatConfig(config) {
+            localStorage.setItem('anticheatConfig', JSON.stringify(config));
         },
         bindEvents() {
             this.elements.autoScroll.addEventListener('change', () => {
@@ -825,6 +955,83 @@ textarea { scrollbar-width: thin; }
             document.querySelectorAll('.tab-button').forEach(btn => {
                 btn.addEventListener('click', () => this.switchTab(btn.getAttribute('data-tab')));
             });
+
+            // 反作弊配置面板事件
+            this.elements.grimConfigToggle.addEventListener('click', () => {
+                const panel = this.elements.grimConfigPanel;
+                panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+            });
+            document.getElementById('grim-apply-config').addEventListener('click', () => this.applyAnticheatConfig());
+            document.getElementById('grim-reset-config').addEventListener('click', () => this.resetAnticheatConfig());
+            document.getElementById('grim-cancel-config').addEventListener('click', () => {
+                this.elements.grimConfigPanel.style.display = 'none';
+                this.elements.grimLeftInput.value = AppState.anticheatConfig.leftKeywords.join(',');
+                this.elements.grimRightInput.value = AppState.anticheatConfig.rightKeywords.join(',');
+            });
+        },
+        applyAnticheatConfig() {
+            const leftRaw = this.elements.grimLeftInput.value.trim();
+            const rightRaw = this.elements.grimRightInput.value.trim();
+            const leftKeywords = leftRaw.split(',').map(k => k.trim()).filter(k => k.length > 0);
+            const rightKeywords = rightRaw.split(',').map(k => k.trim()).filter(k => k.length > 0);
+
+            const newConfig = { leftKeywords, rightKeywords };
+            AppState.anticheatConfig = newConfig;
+            this.saveAnticheatConfig(newConfig);
+
+            // 重新分类 grim/server 行
+            this.reclassifyAnticheatLines();
+            this.elements.grimConfigPanel.style.display = 'none';
+            this.showStatus('反作弊关键词已更新', 2000);
+        },
+        resetAnticheatConfig() {
+            AppState.anticheatConfig = { ...DEFAULT_ANTICHEAT_CONFIG };
+            this.saveAnticheatConfig(AppState.anticheatConfig);
+            this.elements.grimLeftInput.value = AppState.anticheatConfig.leftKeywords.join(',');
+            this.elements.grimRightInput.value = AppState.anticheatConfig.rightKeywords.join(',');
+            this.reclassifyAnticheatLines();
+            this.showStatus('已重置为默认关键词', 2000);
+        },
+        reclassifyAnticheatLines() {
+            // 使用原始显示行重新生成 grimLines 和 serverLines
+            const leftKeys = AppState.anticheatConfig.leftKeywords;
+            const rightKeys = AppState.anticheatConfig.rightKeywords;
+            const newGrim = [];
+            const newServer = [];
+            const lines = AppState.rawDisplayLines;
+            const BATCH = 5000;
+            let index = 0;
+            const statusEl = this.elements.status;
+            const progressEl = document.getElementById('log-load-progress');
+            progressEl.style.display = 'block';
+            const total = lines.length;
+
+            const processBatch = () => {
+                const end = Math.min(index + BATCH, total);
+                for (let i = index; i < end; i++) {
+                    const line = lines[i];
+                    if (leftKeys.some(k => line.includes(k))) newGrim.push(line);
+                    if (rightKeys.some(k => line.includes(k))) newServer.push(line);
+                }
+                index = end;
+                const pct = Math.round((index / total) * 100);
+                statusEl.innerText = `正在重新分类反作弊日志... ${index}/${total} (${pct}%)`;
+                progressEl.innerText = ` 🔄 重新过滤 ${index}/${total} (${pct}%)`;
+                if (index < total) {
+                    requestAnimationFrame(processBatch);
+                } else {
+                    AppState.grimLines = newGrim;
+                    AppState.serverLines = newServer;
+                    this.updateNonConsoleTab();
+                    progressEl.style.display = 'none';
+                    statusEl.innerText = `离线模式 - ${AppState.totalLines} 行日志已加载`;
+                    if (AppState.currentTab === 'grim' && AppState.autoScrollEnabled) {
+                        Utils.smoothScrollToBottomDynamic(this.elements.grimText, 200);
+                        Utils.smoothScrollToBottomDynamic(this.elements.serverText, 200);
+                    }
+                }
+            };
+            requestAnimationFrame(processBatch);
         },
         setAllWrapMode(enabled) {
             const style = enabled ? "pre-wrap" : "pre";
@@ -1137,6 +1344,9 @@ textarea { scrollbar-width: thin; }
                 MinimapManager.refresh();
             } else if (tabId === 'playerip') {
                 this.renderIpPanel();
+            } else if (tabId === 'grim') {
+                this.updateTextareaWithSelection(this.elements.grimText, AppState.grimLines.join('\n'));
+                this.updateTextareaWithSelection(this.elements.serverText, AppState.serverLines.join('\n'));
             } else {
                 this.updateNonConsoleTab();
             }
@@ -1372,6 +1582,7 @@ textarea { scrollbar-width: thin; }
         AppState.joinQuitLines = [];
         AppState.grimLines = [];
         AppState.serverLines = [];
+        AppState.rawDisplayLines = [];
         AppState.ipLoginRecords = [];
         AppState.totalLines = 0;
 
@@ -1402,6 +1613,9 @@ textarea { scrollbar-width: thin; }
 
             if (displayLines.length > 0) {
                 UIManager.appendConsoleLines(displayLines);
+                for (const dl of displayLines) {
+                    AppState.rawDisplayLines.push(dl);
+                }
             }
 
             processed = endIndex;
@@ -1413,15 +1627,14 @@ textarea { scrollbar-width: thin; }
                 setTimeout(() => processBatch(endIndex), 0);
             } else {
                 progressEl.style.display = 'none';
-                statusEl.innerText = `离线模式 - ${total} 行日志已加载`;
+                statusEl.innerText = `${total} 行日志 | 已屏蔽部分服务器报错日志`;
                 AppState.processing = false;
 
                 UIManager.updateNonConsoleTab();
                 MinimapManager.refresh();
 
-                if (AppState.currentTab === 'console' && AppState.autoScrollEnabled) {
-                    Utils.smoothScrollToBottomDynamic(container, 200);
-                }
+                // 修改2：日志加载完成后，强制滚动控制台到底部（忽略 autoScroll 状态）
+                Utils.smoothScrollToBottomDynamic(container, 200);
             }
         }
 
@@ -1439,7 +1652,8 @@ textarea { scrollbar-width: thin; }
         const textInput = document.getElementById('text-input');
         const submitBtn = document.getElementById('submit-log-btn');
 
-        submitBtn.addEventListener('click', function() {
+        // 修改1：文件选择后自动分析
+        fileInput.addEventListener('change', function() {
             if (AppState.processing) return;
             const file = fileInput.files[0];
             if (file) {
@@ -1451,13 +1665,17 @@ textarea { scrollbar-width: thin; }
                     alert('读取文件失败');
                 };
                 reader.readAsText(file, 'UTF-8');
-                return;
             }
+        });
+
+        // 手动分析按钮（用于粘贴文本）
+        submitBtn.addEventListener('click', function() {
+            if (AppState.processing) return;
             const text = textInput.value;
             if (text.trim()) {
                 loadLogFromText(text);
             } else {
-                alert('请选择文件或粘贴日志内容');
+                alert('请粘贴日志内容或选择文件');
             }
         });
 
