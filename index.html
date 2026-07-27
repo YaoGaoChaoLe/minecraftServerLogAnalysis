@@ -79,7 +79,7 @@ body {
    =========================== */
 .console-log-container {
     flex: 1; background: #1a1a1a; font-family: Consolas, monospace;
-    font-size: 15px; line-height: 1.5; padding: 8px;
+    font-size: 12px; line-height: 1.5; padding: 1px;
     overflow: auto;
 }
 .console-log-line { font-family: inherit; font-size: inherit; line-height: inherit; }
@@ -165,7 +165,7 @@ body {
 .log-textarea {
     flex: 1; width: 100%; border: none;
     background: #1a1a1a; color: #e0e0e0; resize: none;
-    font-family: Consolas, monospace; font-size: 15px;
+    font-family: Consolas, monospace; font-size: 13px;
     line-height: 1.5; outline: 0; padding: 8px; min-height: 0;
 }
 
@@ -192,8 +192,8 @@ body {
 .config-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .config-actions button { padding: 6px 14px; background: #2c2c2c; color: #0fc; border: 1px solid #3a3a3a; border-radius: 4px; cursor: pointer; font-size: 13px; }
 .config-actions button:hover { background: #3a3a3a; color: #fff; }
-.config-toggle { cursor: pointer; color: #0fc; text-decoration: underline; font-size: 13px; }
-.config-toggle:hover { color: #fff; }
+.config-toggle { cursor: pointer; color: #FFD700; text-decoration: underline; font-size: 13px; }
+.config-toggle:hover { color: #FFA500; }
 .config-hint { font-size: 12px; color: #aaa; margin-left: 98px; }
 
 /* ===========================
@@ -367,13 +367,10 @@ body {
    滚动条样式
    =========================== */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: #1a1a1a; }
-::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #0fc; }
-textarea { scrollbar-width: thin; }
-#console-log-container::-webkit-scrollbar { width: 12px; }
-#console-log-container::-webkit-scrollbar-thumb { border-radius: 6px; }
-
+::-webkit-scrollbar-track { background: #1a1a1a; } /* 滚动条轨道背景色 */
+::-webkit-scrollbar-thumb { background: #ffffff9f; border-radius: 4px; }/* 滑块默认颜色 */
+::-webkit-scrollbar-thumb:hover { background: #ffffffd4; }/* 滑块悬停颜色 */
+#console-log-container::-webkit-scrollbar { width: 12px; }/* 控制台日志容器专用宽度 */
 /* ===========================
    响应式其他
    =========================== */
@@ -572,8 +569,8 @@ textarea { scrollbar-width: thin; }
 
     // 默认反作弊关键词配置
     const DEFAULT_ANTICHEAT_CONFIG = {
-        leftKeywords: ["触发了","Grim ","meteor","wurst","Mod list mismatch"],
-        rightKeywords: ["[Server]","moved too quickly","本服禁止使用辅助模组"]
+        leftKeywords: ["触发了","[Server]","meteor","wurst","Mod list mismatch"],
+        rightKeywords: ["[Server]","本服禁止使用辅助模组","moved too quickly"]
     };
 
     // ============================================================
@@ -1011,8 +1008,10 @@ textarea { scrollbar-width: thin; }
                 const end = Math.min(index + BATCH, total);
                 for (let i = index; i < end; i++) {
                     const line = lines[i];
-                    if (leftKeys.some(k => line.includes(k))) newGrim.push(line);
-                    if (rightKeys.some(k => line.includes(k))) newServer.push(line);
+                    const cleaned = line.replace(/\[Server thread\/INFO\]: \[Not Secure\] /, "")
+                                        .replace(/\[Server thread\/INFO\]: /, "");
+                    if (leftKeys.some(k => line.includes(k))) newGrim.push(cleaned);
+                    if (rightKeys.some(k => line.includes(k))) newServer.push(cleaned);
                 }
                 index = end;
                 const pct = Math.round((index / total) * 100);
