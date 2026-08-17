@@ -301,7 +301,7 @@
             min-height: 0;
         }
 
-        /* 反作弊日志左右分栏 */
+        /* 反作弊日志左右分栏 - 保留但不再使用，改为新结构 */
         .split-panel {
             display: flex;
             gap: 10px;
@@ -729,6 +729,79 @@
                 gap: 8px;
             }
         }
+
+        /* ===== 反作弊标签页分割布局（离线版） ===== */
+        .grim-split-container {
+            display: flex;
+            flex: 1;
+            min-height: 0;
+            height: 100%;
+            width: 100%;
+        }
+        .grim-panel {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            min-height: 0;
+            overflow: hidden;
+        }
+        .grim-left {
+            flex-shrink: 0;
+            width: 50%;
+        }
+        .grim-right {
+            flex: 1;
+        }
+        .grim-divider {
+            width: 6px;
+            flex-shrink: 0;
+            cursor: col-resize;
+            background: #2c2c2c;
+            position: relative;
+            transition: background 0.15s ease;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        .grim-divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 2px;
+            height: 32px;
+            background: #666;
+            border-radius: 1px;
+            transition: all 0.15s ease;
+        }
+        .grim-divider:hover,
+        .grim-divider.dragging {
+            background: #00e5ff;
+            box-shadow: 0 0 20px rgba(0,229,255,0.4);
+        }
+        .grim-divider:hover::before,
+        .grim-divider.dragging::before {
+            background: #0a0a0a;
+            height: 44px;
+        }
+
+        /* 移动端适配：隐藏分隔条，上下排列 */
+        @media (max-width: 600px) {
+            .grim-split-container {
+                flex-direction: column;
+            }
+            .grim-left {
+                width: 100% !important;
+                flex: 1;
+            }
+            .grim-right {
+                flex: 1;
+            }
+            .grim-divider {
+                display: none;
+            }
+        }
     </style>
 </head>
 <body>
@@ -776,7 +849,6 @@
                             <span>缩略图行数:</span>
                             <input type="number" id="minimap-window-size" class="minimap-window-input" value="1000" min="200" max="100000" step="200">
                         </label>
-                        <!-- 屏蔽报错复选框，移动到缩略图行数右侧 -->
                         <label class="filter-errors-check"><input type="checkbox" id="filter-errors" checked> 屏蔽报错</label>
                     </div>
                 </div>
@@ -816,7 +888,7 @@
             <textarea id="joinquit-text" class="log-textarea" readonly wrap="off"></textarea>
         </div>
 
-        <!-- 仅看关键词（原反作弊日志） -->
+        <!-- ===== 仅看关键词（已修改：添加分隔条） ===== -->
         <div id="tab-grim" class="tab-content">
             <div class="sub-header">
                 <span>仅看关键词</span>
@@ -838,13 +910,15 @@
                     <button id="grim-cancel-config">取消</button>
                 </div>
             </div>
-            <div class="split-panel">
-                <div class="split-half">
-                    <div class="sub-header">包含 关键词1 的日志</div>
+            <!-- 新结构：左面板 + 分隔条 + 右面板 -->
+            <div class="grim-split-container">
+                <div class="grim-panel grim-left" id="grim-left-panel">
+                    <div class="sub-header" style="border-radius:0;border-bottom:1px solid #3a3a3a;">包含 关键词1 的日志</div>
                     <textarea id="grim-text" class="log-textarea" readonly wrap="off"></textarea>
                 </div>
-                <div class="split-half">
-                    <div class="sub-header">包含 关键词2 的日志</div>
+                <div class="grim-divider" id="grim-divider" title="拖动调整左右宽度"></div>
+                <div class="grim-panel grim-right">
+                    <div class="sub-header" style="border-radius:0;border-bottom:1px solid #3a3a3a;">包含 关键词2 的日志</div>
                     <textarea id="server-text" class="log-textarea" readonly wrap="off"></textarea>
                 </div>
             </div>
@@ -1748,8 +1822,7 @@
                                 if (!data.success) throw new Error(data.message || "查询失败");
                                 return { location: `${data.country} ${data.region} ${data.city}`,
                                     lat: data.latitude, lng: data.longitude,
-                                    street: `代理: ${data.proxy ? "是" : "否"} | ISP: ${data.isp || "未知"}`
-                                };
+                                    street: `代理: ${data.proxy ? "是" : "否"} | ISP: ${data.isp || "未知"}` };
                             } }
                     ];
                     let html = '';
@@ -2123,7 +2196,82 @@
             }
 
             // ============================================================
-            // 9. 初始化
+            // 9. 反作弊标签页分隔条拖拽（离线版）
+            // ============================================================
+            (function initGrimDivider() {
+                const divider = document.getElementById('grim-divider');
+                const leftPanel = document.getElementById('grim-left-panel');
+                const container = divider?.parentElement;
+                if (!divider || !leftPanel || !container) return;
+
+                let isDragging = false;
+                let startX = 0;
+                let startLeftWidth = 0;
+
+                function getContainerWidth() {
+                    return container.getBoundingClientRect().width;
+                }
+
+                function setLeftWidth(percent) {
+                    const clamped = Math.min(90, Math.max(10, percent));
+                    leftPanel.style.width = clamped + '%';
+                    return clamped;
+                }
+
+                function startDrag(e) {
+                    e.preventDefault();
+                    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                    isDragging = true;
+                    divider.classList.add('dragging');
+                    startX = clientX;
+                    startLeftWidth = leftPanel.getBoundingClientRect().width;
+                    document.body.style.userSelect = 'none';
+                    document.body.style.webkitUserSelect = 'none';
+
+                    document.addEventListener('mousemove', onDragMove);
+                    document.addEventListener('mouseup', onDragEnd);
+                    document.addEventListener('touchmove', onDragMove, { passive: false });
+                    document.addEventListener('touchend', onDragEnd);
+                    document.addEventListener('touchcancel', onDragEnd);
+                }
+
+                function onDragMove(e) {
+                    if (!isDragging) return;
+                    e.preventDefault();
+                    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                    const deltaX = clientX - startX;
+                    const containerWidth = getContainerWidth();
+                    if (containerWidth <= 0) return;
+                    const dividerWidth = divider.offsetWidth || 6;
+                    const available = containerWidth - dividerWidth;
+                    let newWidth = startLeftWidth + deltaX;
+                    let percent = (newWidth / available) * 100;
+                    setLeftWidth(percent);
+                }
+
+                function onDragEnd() {
+                    if (!isDragging) return;
+                    isDragging = false;
+                    divider.classList.remove('dragging');
+                    document.body.style.userSelect = '';
+                    document.body.style.webkitUserSelect = '';
+                    document.removeEventListener('mousemove', onDragMove);
+                    document.removeEventListener('mouseup', onDragEnd);
+                    document.removeEventListener('touchmove', onDragMove);
+                    document.removeEventListener('touchend', onDragEnd);
+                    document.removeEventListener('touchcancel', onDragEnd);
+                }
+
+                divider.addEventListener('mousedown', startDrag);
+                divider.addEventListener('touchstart', startDrag, { passive: false });
+
+                divider.addEventListener('dblclick', function() {
+                    setLeftWidth(50);
+                });
+            })();
+
+            // ============================================================
+            // 10. 初始化
             // ============================================================
             document.addEventListener('DOMContentLoaded', function() {
                 UIManager.init();
